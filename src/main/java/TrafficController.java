@@ -1,33 +1,46 @@
+import Database.TrafficDatabaseImpl;
+import Kafka.SampleKafkaProducer;
+import Utils.Scheduler;
+
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.pcap4j.core.*;
 import org.pcap4j.packet.Packet;
 import org.pcap4j.util.NifSelector;
+
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 
-public class GetPackets {
+public class TrafficController {
+    Scheduler scheduler = new Scheduler();
+    TrafficDatabaseImpl trafficDatabase = new TrafficDatabaseImpl();
+    SampleKafkaProducer kafkaProducer = new SampleKafkaProducer();
+    long byteSum = 0;
+    boolean working = false;
 
-    private static final String COUNT_KEY = GetPackets.class.getName() + ".count";
-    private static final int COUNT = Integer.getInteger(COUNT_KEY, 5);
+    private static final String COUNT_KEY = TrafficController.class.getName() + ".count";
+    private static final int COUNT = Integer.getInteger(COUNT_KEY, 100000);
 
-    private static final String READ_TIMEOUT_KEY = GetPackets.class.getName() + ".readTimeout";
+    private static final String READ_TIMEOUT_KEY = TrafficController.class.getName() + ".readTimeout";
     private static final int READ_TIMEOUT = Integer.getInteger(READ_TIMEOUT_KEY, 10); // [ms]
 
-    private static final String SNAPLEN_KEY = GetPackets.class.getName() + ".snaplen";
+    private static final String SNAPLEN_KEY = TrafficController.class.getName() + ".snaplen";
     private static final int SNAPLEN = Integer.getInteger(SNAPLEN_KEY, 65536); // [bytes]
 
-    private static final String BUFFER_SIZE_KEY = GetPackets.class.getName() + ".bufferSize";
+    private static final String BUFFER_SIZE_KEY = TrafficController.class.getName() + ".bufferSize";
     private static final int BUFFER_SIZE = Integer.getInteger(BUFFER_SIZE_KEY, 1 * 1024 * 1024); // [bytes]
 
-    public static void main(String[] args) throws PcapNativeException, NotOpenException {
-
-        String filter = args.length != 0 ? args[0] : "";
-
+    public void startTrafficMonitoring() throws PcapNativeException, NotOpenException {
         System.out.println(COUNT_KEY + ": " + COUNT);
         System.out.println(READ_TIMEOUT_KEY + ": " + READ_TIMEOUT);
         System.out.println(SNAPLEN_KEY + ": " + SNAPLEN);
         System.out.println(BUFFER_SIZE_KEY + ": " + BUFFER_SIZE);
         System.out.println("\n");
+
+        String filter = "";
+        kafkaProducer.createProducer();
+        //String filter = args.length != 0 ? args[0] : "";
+
 
         PcapNetworkInterface nif;
         try {
@@ -50,8 +63,15 @@ public class GetPackets {
         handle.setFilter(filter, BpfProgram.BpfCompileMode.OPTIMIZE);
 
         int num = 0;
-        long byteSum = 0;
+
+        Runnable computationTraffic = () -> {
+            checkConditions();
+        };
+
+        scheduler.startRunnable(computationTraffic, 5, 5, TimeUnit.SECONDS);
+
         while (true) {
+            working = true;
             Packet packet = handle.getNextPacket();
             if (packet != null) {
                 byteSum += packet.length();
@@ -70,17 +90,18 @@ public class GetPackets {
         handle.close();
     }
 
-    public void kafkaCode() {
-        //KafkaAdmin kafkaAdmin = new KafkaAdmin();
-        SampleProducer kafkaProducer = new SampleProducer();
-
-        //kafkaAdmin.createAdmin();
-        kafkaProducer.createProducer();
-
-        //kafkaAdmin.createTopic("alerts");
-        kafkaProducer.createMessage(new ProducerRecord("alerts", "alert", "minOrMax"));
-
-        //kafkaAdmin.closeAdmin();
-        kafkaProducer.closeProducer();
+    private void checkConditions() {
+        long min = trafficDatabase.getMin();
+        long max = trafficDatabase.getMax();
+        if (byteSum < min || byteSum > max) {
+            sendKafkaAlert();
+        }
     }
+
+    private void sendKafkaAlert() {
+        kafkaProducer.createMessage(new ProducerRecord("alerts", "alert", "minOrMax"));
+        System.out.println("alert");
+        //kafkaProducer.closeProducer();
+    }
+
 }
