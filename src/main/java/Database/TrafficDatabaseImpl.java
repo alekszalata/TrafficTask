@@ -1,5 +1,7 @@
-
+package Database;
+import Utils.PropertyReader;
 import org.apache.commons.io.FileUtils;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -22,10 +24,10 @@ public class TrafficDatabaseImpl {
                     user, password);
             currentConnection = connection;
             File initSql = new File("src/main/resources/database/init.sql");
-            System.out.println("everything was created");
             Statement statement = connection.createStatement();
             String s = FileUtils.readFileToString(initSql, StandardCharsets.UTF_8);
             statement.executeUpdate(s);
+            System.out.println("everything was created");
         } catch (SQLException e) {
             System.out.println("Connection failure!");
             closeConnection();
@@ -49,6 +51,42 @@ public class TrafficDatabaseImpl {
             e.printStackTrace();
             closeConnection();
         }
+    }
+
+    public long getMin() {
+        final String GET_MIN = "SELECT limit_value FROM limits_per_hour WHERE " +
+                "limit_name = 'min' AND effective_date = (SELECT MAX(effective_date) FROM limits_per_hour " +
+                "WHERE limit_name = 'min');";
+        try {
+            Statement statement = currentConnection.createStatement();
+            ResultSet rs = statement.executeQuery(GET_MIN);
+            if (rs.next()) {
+                return rs.getLong("limit_value");
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            closeConnection();
+        }
+        return -1;
+    }
+
+    public long getMax() {
+        final String GET_MAX = "SELECT limit_value FROM limits_per_hour WHERE " +
+                "limit_name = 'max' AND effective_date = (SELECT MAX(effective_date) FROM limits_per_hour " +
+                "WHERE limit_name = 'max');";
+        try {
+            Statement statement = currentConnection.createStatement();
+            ResultSet rs = statement.executeQuery(GET_MAX);
+            if (rs.next()) {
+                return rs.getLong("limit_value");
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            closeConnection();
+        }
+        return -1;
     }
 
     private void closeConnection() {
