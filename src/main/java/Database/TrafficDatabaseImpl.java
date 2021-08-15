@@ -4,10 +4,11 @@ import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 
-public class TrafficDatabaseImpl {
+public class TrafficDatabaseImpl implements Serializable {
     private Connection currentConnection;
 
     public TrafficDatabaseImpl() {

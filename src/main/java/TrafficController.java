@@ -4,22 +4,19 @@ import Utils.Scheduler;
 
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.pcap4j.core.*;
+import org.pcap4j.packet.IpV4Packet;
 import org.pcap4j.packet.Packet;
 import org.pcap4j.util.NifSelector;
 
-import java.io.IOException;
+import java.io.*;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.concurrent.TimeUnit;
 
 
 public class TrafficController {
-    Scheduler scheduler = new Scheduler();
-    TrafficDatabaseImpl trafficDatabase = new TrafficDatabaseImpl();
-    SampleKafkaProducer kafkaProducer = new SampleKafkaProducer();
-    long byteSum = 0;
-    boolean working = false;
-
     private static final String COUNT_KEY = TrafficController.class.getName() + ".count";
-    private static final int COUNT = Integer.getInteger(COUNT_KEY, 100000);
+    private static final int COUNT = Integer.getInteger(COUNT_KEY, 5);
 
     private static final String READ_TIMEOUT_KEY = TrafficController.class.getName() + ".readTimeout";
     private static final int READ_TIMEOUT = Integer.getInteger(READ_TIMEOUT_KEY, 10); // [ms]
@@ -30,7 +27,7 @@ public class TrafficController {
     private static final String BUFFER_SIZE_KEY = TrafficController.class.getName() + ".bufferSize";
     private static final int BUFFER_SIZE = Integer.getInteger(BUFFER_SIZE_KEY, 1 * 1024 * 1024); // [bytes]
 
-    public void startTrafficMonitoring() throws PcapNativeException, NotOpenException {
+    public void startTrafficMonitoring() throws PcapNativeException, NotOpenException, IOException, InterruptedException {
         System.out.println(COUNT_KEY + ": " + COUNT);
         System.out.println(READ_TIMEOUT_KEY + ": " + READ_TIMEOUT);
         System.out.println(SNAPLEN_KEY + ": " + SNAPLEN);
@@ -38,8 +35,18 @@ public class TrafficController {
         System.out.println("\n");
 
         String filter = "";
-        kafkaProducer.createProducer();
         //String filter = args.length != 0 ? args[0] : "";
+
+        //Creating Spark
+        SparkController sparkController = new SparkController();
+        Thread t = new Thread(sparkController);
+        t.start();
+
+        int port = 9010;
+        ServerSocket serverSocket = new ServerSocket(port);
+        Socket clientSocket = serverSocket.accept();
+
+        PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
 
 
         PcapNetworkInterface nif;
@@ -63,19 +70,16 @@ public class TrafficController {
         handle.setFilter(filter, BpfProgram.BpfCompileMode.OPTIMIZE);
 
         int num = 0;
-
-        Runnable computationTraffic = () -> {
-            checkConditions();
-        };
-
-        scheduler.startRunnable(computationTraffic, 5, 5, TimeUnit.SECONDS);
-
         while (true) {
-            working = true;
             Packet packet = handle.getNextPacket();
             if (packet != null) {
-                byteSum += packet.length();
-                System.out.println(String.format("packet %s size: %s bytes", num + 1, packet.length()));
+                out.println(packet.length());
+                out.flush();
+                //packet.get(IpV4Packet.class).getHeader().getDstAddr();
+                //byte[] message = packet.getRawData();
+                //dOut.writeInt(message.length); // write length of the message
+                //dOut.write(message);
+                //System.out.println(String.format("packet %s size: %s bytes", num + 1, packet.length()));
                 num++;
                 if (num >= COUNT) {
                     break;
@@ -83,25 +87,10 @@ public class TrafficController {
             }
         }
 
-        PcapStat ps = handle.getStats();
-        System.out.println("total sum: " + byteSum);
-        System.out.println("ps_recv: " + ps.getNumPacketsReceived());
-
-        handle.close();
+//        PcapStat ps = handle.getStats();
+//        System.out.println("ps_recv: " + ps.getNumPacketsReceived());
+//        handle.close();
     }
 
-    private void checkConditions() {
-        long min = trafficDatabase.getMin();
-        long max = trafficDatabase.getMax();
-        if (byteSum < min || byteSum > max) {
-            sendKafkaAlert();
-        }
-    }
-
-    private void sendKafkaAlert() {
-        kafkaProducer.createMessage(new ProducerRecord("alerts", "alert", "minOrMax"));
-        System.out.println("alert");
-        //kafkaProducer.closeProducer();
-    }
 
 }
