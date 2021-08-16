@@ -1,17 +1,12 @@
-import Database.TrafficDatabaseImpl;
-import Kafka.SampleKafkaProducer;
-import Utils.Scheduler;
-
-import org.apache.kafka.clients.producer.ProducerRecord;
+import Utils.PropertyReader;
+import org.javatuples.Pair;
 import org.pcap4j.core.*;
 import org.pcap4j.packet.IpV4Packet;
 import org.pcap4j.packet.Packet;
 import org.pcap4j.util.NifSelector;
 
 import java.io.*;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.concurrent.TimeUnit;
+import java.net.*;
 
 
 public class TrafficController {
@@ -27,6 +22,23 @@ public class TrafficController {
     private static final String BUFFER_SIZE_KEY = TrafficController.class.getName() + ".bufferSize";
     private static final int BUFFER_SIZE = Integer.getInteger(BUFFER_SIZE_KEY, 1 * 1024 * 1024); // [bytes]
 
+    private IpSearch ipSearch = IpSearch.NOTHING;
+    private Inet4Address ipAddress;
+
+    public TrafficController(Pair<String, String> argKeyValue) throws UnknownHostException {
+        if (argKeyValue.getValue0().equals("-s")) {
+            ipSearch = IpSearch.SOURCE;
+            ipAddress = (Inet4Address) InetAddress.getByName(argKeyValue.getValue1());
+        } else if (argKeyValue.getValue0().equals("-d")) {
+            ipSearch = IpSearch.DESTINATION;
+            ipAddress = (Inet4Address) InetAddress.getByName(argKeyValue.getValue1());
+        }
+    }
+
+    public TrafficController() {
+
+    }
+
     public void startTrafficMonitoring() throws PcapNativeException, NotOpenException, IOException, InterruptedException {
         System.out.println(COUNT_KEY + ": " + COUNT);
         System.out.println(READ_TIMEOUT_KEY + ": " + READ_TIMEOUT);
@@ -34,16 +46,14 @@ public class TrafficController {
         System.out.println(BUFFER_SIZE_KEY + ": " + BUFFER_SIZE);
         System.out.println("\n");
 
-        String filter = "";
-        //String filter = args.length != 0 ? args[0] : "";
 
         //Creating Spark
         SparkController sparkController = new SparkController();
         Thread t = new Thread(sparkController);
         t.start();
 
-        int port = 9010;
-        ServerSocket serverSocket = new ServerSocket(port);
+        int socketPort = Integer.parseInt(PropertyReader.getProperties().getProperty("socketPort"));
+        ServerSocket serverSocket = new ServerSocket(socketPort);
         Socket clientSocket = serverSocket.accept();
 
         PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
@@ -67,30 +77,41 @@ public class TrafficController {
                 .timeoutMillis(READ_TIMEOUT)
                 .bufferSize(BUFFER_SIZE);
         PcapHandle handle = phb.build();
-        handle.setFilter(filter, BpfProgram.BpfCompileMode.OPTIMIZE);
 
         int num = 0;
         while (true) {
             Packet packet = handle.getNextPacket();
             if (packet != null) {
-                out.println(packet.length());
-                out.flush();
-                //packet.get(IpV4Packet.class).getHeader().getDstAddr();
-                //byte[] message = packet.getRawData();
-                //dOut.writeInt(message.length); // write length of the message
-                //dOut.write(message);
-                //System.out.println(String.format("packet %s size: %s bytes", num + 1, packet.length()));
-                num++;
-                if (num >= COUNT) {
-                    break;
+                boolean allowPacket = false;
+                switch (ipSearch) {
+                    case NOTHING -> allowPacket = true;
+                    case SOURCE -> {
+                        if (ipAddress == packet.get(IpV4Packet.class).getHeader().getSrcAddr()) {
+                            allowPacket = true;
+                        }
+                    }
+                    case DESTINATION -> {
+                        if (ipAddress == packet.get(IpV4Packet.class).getHeader().getDstAddr()) {
+                            allowPacket = true;
+                        }
+                    }
                 }
+                if (allowPacket) {
+                    out.println(packet.length());
+                    out.flush();
+                    num++;
+                    if (num >= COUNT) {
+                        //break;
+                    }
+                }
+
             }
         }
-
-//        PcapStat ps = handle.getStats();
-//        System.out.println("ps_recv: " + ps.getNumPacketsReceived());
-//        handle.close();
     }
+}
 
-
+enum IpSearch {
+    NOTHING,
+    SOURCE,
+    DESTINATION
 }

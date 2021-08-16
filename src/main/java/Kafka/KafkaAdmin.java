@@ -1,5 +1,6 @@
 package Kafka;
 
+import Utils.PropertyReader;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -13,9 +14,12 @@ public class KafkaAdmin {
 
     private Admin admin;
 
-    public void createAdmin() {
+    public KafkaAdmin() {
+
         Properties properties = new Properties();
-        properties.put("bootstrap.servers", "localhost:9092");
+        String kafkaIp = PropertyReader.getProperties().getProperty("kafkaIp");
+        String kafkaPort = PropertyReader.getProperties().getProperty("kafkaPort");
+        properties.put("bootstrap.servers", String.format("%s:%s", kafkaIp, kafkaPort));
         try {
             admin = Admin.create(properties);
         } catch (Exception e) {
@@ -30,18 +34,20 @@ public class KafkaAdmin {
     public void createTopic(String topicName) {
         int partitions = 1;
         short replicationFactor = 1;
-        NewTopic newTopic = new NewTopic("alerts", partitions, replicationFactor);
+        NewTopic newTopic = new NewTopic(topicName, partitions, replicationFactor);
 
         CreateTopicsResult result = admin.createTopics(
                 Collections.singleton(newTopic)
         );
 
-        KafkaFuture<Void> future = result.values().get("alerts");
+        KafkaFuture<Void> future = result.values().get(topicName);
         try {
             future.get();
         } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
         }
     }
+
+
 
 }

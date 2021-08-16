@@ -1,4 +1,5 @@
 package Database;
+
 import Utils.PropertyReader;
 import org.apache.commons.io.FileUtils;
 
@@ -19,16 +20,15 @@ public class TrafficDatabaseImpl implements Serializable {
             String user = PropertyReader.getProperties().getProperty("user");
             String password = PropertyReader.getProperties().getProperty("password");
             String dbName = PropertyReader.getProperties().getProperty("dbName");
-            String schemaName = PropertyReader.getProperties().getProperty("schemaName");
             Connection connection = DriverManager.getConnection(
-                    String.format("jdbc:postgresql://%s:%s/%s?currentSchema=%s", ip, port, dbName, schemaName),
+                    String.format("jdbc:postgresql://%s:%s/%s", ip, port, dbName),
                     user, password);
             currentConnection = connection;
             File initSql = new File("src/main/resources/database/init.sql");
             Statement statement = connection.createStatement();
             String s = FileUtils.readFileToString(initSql, StandardCharsets.UTF_8);
             statement.executeUpdate(s);
-            System.out.println("everything was created");
+            System.out.println("Database: init file was executed");
         } catch (SQLException e) {
             System.out.println("Connection failure!");
             closeConnection();
@@ -39,24 +39,9 @@ public class TrafficDatabaseImpl implements Serializable {
         }
     }
 
-    public void updateValue(String valueName, String value, String date) {
-        final String ADD_USER_POINTS_SQL = "UPDATE limits_per_hour " +
-                String.format("SET limit_value = %s, effective_date = %s", value, date) +
-                String.format("WHERE limit_name = %s", valueName);
-
-        try {
-            Statement statement = currentConnection.createStatement();
-            statement.executeUpdate(ADD_USER_POINTS_SQL);
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-            closeConnection();
-        }
-    }
-
     public long getMin() {
-        final String GET_MIN = "SELECT limit_value FROM limits_per_hour WHERE " +
-                "limit_name = 'min' AND effective_date = (SELECT MAX(effective_date) FROM limits_per_hour " +
+        final String GET_MIN = "SELECT limit_value FROM traffic_limits.limits_per_hour WHERE " +
+                "limit_name = 'min' AND effective_date = (SELECT MAX(effective_date) FROM traffic_limits.limits_per_hour " +
                 "WHERE limit_name = 'min');";
         try {
             Statement statement = currentConnection.createStatement();
@@ -73,8 +58,8 @@ public class TrafficDatabaseImpl implements Serializable {
     }
 
     public long getMax() {
-        final String GET_MAX = "SELECT limit_value FROM limits_per_hour WHERE " +
-                "limit_name = 'max' AND effective_date = (SELECT MAX(effective_date) FROM limits_per_hour " +
+        final String GET_MAX = "SELECT limit_value FROM traffic_limits.limits_per_hour WHERE " +
+                "limit_name = 'max' AND effective_date = (SELECT MAX(effective_date) FROM traffic_limits.limits_per_hour " +
                 "WHERE limit_name = 'max');";
         try {
             Statement statement = currentConnection.createStatement();
