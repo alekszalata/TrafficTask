@@ -44,7 +44,7 @@ public class SparkController implements Runnable {
                 if (Integer.parseInt(dataSum) < ValueStorage.min) {  // < min
                     SampleKafkaProducer.staticSendMessage(new ProducerRecord(topicName, "alert", "minAlert"));
                     System.out.println("Send min alert");
-                } else if (Integer.parseInt(dataSum) >  ValueStorage.min) {  // > max
+                } else if (Integer.parseInt(dataSum) >  ValueStorage.max) {  // > max
                     SampleKafkaProducer.staticSendMessage(new ProducerRecord(topicName, "alert", "maxAlert"));
                     System.out.println("Send max alert");
                 }
