@@ -72,16 +72,6 @@
             <version>0.2</version>
         </dependency>
 
-
-        <!-- https://mvnrepository.com/artifact/kafka-utils/kafka-utils -->
-        <dependency>
-            <groupId>kafka-utils</groupId>
-            <artifactId>kafka-utils</artifactId>
-            <version>0.1.1</version>
-        </dependency>
-
-
-
     </dependencies>
 
 
