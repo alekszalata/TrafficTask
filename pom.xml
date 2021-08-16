@@ -59,6 +59,28 @@
             <version>42.2.23</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.javatuples</groupId>
+            <artifactId>javatuples</artifactId>
+            <version>1.2</version>
+        </dependency>
+
+        <!-- https://mvnrepository.com/artifact/com.101tec/zkclient -->
+        <dependency>
+            <groupId>com.101tec</groupId>
+            <artifactId>zkclient</artifactId>
+            <version>0.2</version>
+        </dependency>
+
+
+        <!-- https://mvnrepository.com/artifact/kafka-utils/kafka-utils -->
+        <dependency>
+            <groupId>kafka-utils</groupId>
+            <artifactId>kafka-utils</artifactId>
+            <version>0.1.1</version>
+        </dependency>
+
+
 
     </dependencies>
 
