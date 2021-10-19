@@ -1,6 +1,7 @@
 # TrafficTask
 
 Скачать проект с https://github.com/alekszalata/TrafficTask/tree/develop
+
 Для запуска:
 1) Запустить Kafka и Zookeeper. Для этого перейти в папку src/docker-kafka, открыть консоль в этой папке и написать: docker compose up
 2) Установить зависимости из pom.xml
